@@ -106,6 +106,18 @@ public final class ProcessSampler: @unchecked Sendable {
         return length > 0 ? String(cString: buffer) : nil
     }
 
+    /// Processes running exactly this executable, with when each one started.
+    public static func running(executable: String) -> [(pid: Int32, started: Date)] {
+        allPIDs().compactMap { pid in
+            guard pid > 0, path(pid) == executable else { return nil }
+            var info = proc_bsdinfo()
+            let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+            guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
+            let started = Date(timeIntervalSince1970: TimeInterval(info.pbi_start_tvsec) + TimeInterval(info.pbi_start_tvusec) / 1e6)
+            return (pid, started)
+        }
+    }
+
     static func name(_ pid: Int32) -> String? {
         var buffer = [CChar](repeating: 0, count: 256)
         let length = proc_name(pid, &buffer, UInt32(buffer.count))

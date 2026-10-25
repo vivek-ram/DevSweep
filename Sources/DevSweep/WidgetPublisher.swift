@@ -23,7 +23,24 @@ final class WidgetPublisher {
         timer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { _ in
             Task { @MainActor in WidgetPublisher.shared.publish(soon: false) }
         }
+        stopOutdatedExtension()
         publish(soon: true)
+    }
+
+    /// After an update macOS can keep the previous build's widget extension running. Everything
+    /// it draws is then thrown away (its bundle version no longer matches the installed one) and
+    /// the widgets stay blank. Stop it; macOS starts the new one for the next redraw.
+    private func stopOutdatedExtension() {
+        guard let plugIns = Bundle.main.builtInPlugInsPath else { return }
+        let executable = plugIns + "/DevSweepWidgets.appex/Contents/MacOS/DevSweepWidgets"
+        // The status-change time, not the modification date: copying from a disk image keeps the
+        // build's modification date, but every copy gets a fresh change time.
+        var info = stat()
+        guard stat(executable, &info) == 0 else { return }
+        let installed = Date(timeIntervalSince1970: TimeInterval(info.st_ctimespec.tv_sec) + TimeInterval(info.st_ctimespec.tv_nsec) / 1e9)
+        for process in ProcessSampler.running(executable: executable) where process.started < installed {
+            kill(process.pid, SIGTERM)
+        }
     }
 
     /// Writes a fresh snapshot. `soon` (after a scan or clean) also asks the widgets to redraw

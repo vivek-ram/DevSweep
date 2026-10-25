@@ -136,9 +136,15 @@ and free space; pick them in *Settings → Automation*):
 
 ### Desktop widgets
 Mac Health, Storage and Temperature widgets in small, medium and large sizes, for the desktop or
-Notification Center. Right-click the desktop, choose **Edit Widgets…** and search for DevSweep.
+Notification Center.
+
+1. Open DevSweep once, so it can write what the widgets show.
+2. Right-click an empty part of the desktop and choose **Edit Widgets…**.
+3. Search for **DevSweep**, pick a widget and a size, and drag it onto the desktop.
+
 Clicking a widget opens that page in DevSweep. They refresh after every scan or clean and every
 few minutes while placed; macOS limits how often widgets redraw, so for live numbers use the menu bar.
+If a widget stays blank, open DevSweep: after an update it restarts the widget extension.
 
 <p align="center"><img src="docs/screenshots/widgets.png" alt="Desktop widgets" width="880"></p>
 
@@ -165,15 +171,15 @@ few minutes while placed; macOS limits how often widgets redraw, so for live num
 
 ## Install
 
-1. Download **DevSweep-1.0.0.dmg** from the [latest release](https://github.com/vivek-ram/DevSweep/releases/latest).
+1. Download **DevSweep-1.1.0.dmg** from the [latest release](https://github.com/vivek-ram/DevSweep/releases/latest).
 2. Open it and drag **DevSweep** into **Applications**.
 3. Open DevSweep. It suggests the folders where your projects live; pick them and press
    **Start Scanning**.
 
 Requires macOS 14 Sonoma or later, on Apple silicon or Intel.
 
-> **First launch.** DevSweep is ad-hoc signed, not notarized by Apple, so macOS blocks it the
-> first time you open it. Go to **System Settings → Privacy & Security** and click **Open Anyway**,
+> **First launch.** DevSweep is signed with a Developer ID but not yet notarized by Apple, so macOS
+> blocks it the first time you open it. Go to **System Settings → Privacy & Security** and click **Open Anyway**,
 > or run:
 > ```bash
 > xattr -dr com.apple.quarantine /Applications/DevSweep.app
