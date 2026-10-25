@@ -59,7 +59,19 @@ private struct GeneralSettings: View {
                 .pickerStyle(.radioGroup)
                 Toggle("Open DevSweep at login", isOn: Binding(get: { settings.launchAtLogin },
                                                               set: { settings.setLaunchAtLogin($0) }))
-                Toggle("Show free space next to the menu bar icon", isOn: $settings.menuBarShowsFreeSpace)
+                LabeledContent("Next to the menu bar icon") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(MenuBarStat.allCases) { stat in
+                            Toggle(stat.title, isOn: Binding(
+                                get: { settings.menuBarStats.contains(stat) },
+                                set: { on in
+                                    var stats = settings.menuBarStats.filter { $0 != stat }
+                                    if on { stats.append(stat) }
+                                    settings.menuBarStats = MenuBarStat.allCases.filter(stats.contains)
+                                }))
+                        }
+                    }
+                }
                 Toggle(isOn: $settings.trackSpaceHistory) {
                     Text("Keep a history of disk usage")
                     Text("Measures your home folder once a day to chart free space and spot folders that suddenly grow.")

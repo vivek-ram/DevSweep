@@ -20,6 +20,7 @@ commands:
   login-items             Background items that start with your Mac
   stats                   CPU, memory, network and battery right now
   top                     Apps using the most memory and CPU (helpers included)
+  heat                    Temperatures and the apps drawing the most power
   privacy                 Browser history, cookies and site data, per browser
   updates                 Apps with a newer version (App Store, Sparkle, Homebrew)
   cloud                   Cloud files that also take space on this Mac
@@ -287,6 +288,20 @@ case "top":
     print("Memory used \(Format.bytes(snapshot.memoryUsed)) of \(Format.bytes(snapshot.memoryTotal)) · apps \(Format.bytes(snapshot.memoryApp)) · wired \(Format.bytes(snapshot.memoryWired)) · compressed \(Format.bytes(snapshot.memoryCompressed)) · cached \(Format.bytes(snapshot.memoryCached))")
     for app in apps.prefix(15) {
         print(String(format: "%10@  %5.1f%% CPU  %3d proc  %@", Format.bytes(app.memory), app.cpu * 100, app.processCount, app.name))
+    }
+case "heat":
+    let sampler = ProcessSampler()
+    _ = sampler.sample()
+    try await Task.sleep(for: .seconds(2))
+    let apps = sampler.sample().sorted { $0.watts > $1.watts }
+    let thermal = ThermalSensors.read()
+    print("State: \(thermal.state.title) · CPU \(thermal.cpu.map { String(format: "%.0f°C", $0) } ?? "—") · hottest \(thermal.hottest.map { String(format: "%.0f°C", $0) } ?? "—") · battery \(thermal.battery.map { String(format: "%.0f°C", $0) } ?? "—")")
+    for sensor in thermal.sensors.prefix(args.contains("--all") ? 200 : 8) {
+        print(String(format: "  %5.1f°C  %@", sensor.celsius, sensor.name))
+    }
+    print("Heating it up:")
+    for app in apps.prefix(10) {
+        print(String(format: "  %6.2f W  %5.1f%% CPU  %@", app.watts, app.cpu * 100, app.name))
     }
 case "maintenance":
     print("Purgeable:", Maintenance.purgeableBytes().map(Format.bytes) ?? "?")

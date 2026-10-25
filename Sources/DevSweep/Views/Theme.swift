@@ -24,6 +24,7 @@ struct ModuleTheme: Equatable {
     static let privacy = ModuleTheme(colors: [hex(0xF43F5E), hex(0xFB923C)], glyph: "hand.raised.fill")
     static let maintenance = ModuleTheme(colors: [hex(0xF59E0B), hex(0xF97316)], glyph: "gauge.with.dots.needle.67percent")
     static let memory = ModuleTheme(colors: [hex(0x22D3EE), hex(0x818CF8)], glyph: "memorychip.fill")
+    static let heat = ModuleTheme(colors: [hex(0xFB923C), hex(0xEF4444)], glyph: "thermometer.medium")
     static let loginItems = ModuleTheme(colors: [hex(0xFB7185), hex(0xC084FC)], glyph: "power")
     static let uninstaller = ModuleTheme(colors: [hex(0x0EA5E9), hex(0x6366F1)], glyph: "xmark.app.fill")
     static let updater = ModuleTheme(colors: [hex(0x3B82F6), hex(0x06B6D4)], glyph: "arrow.down.app.fill")
@@ -47,6 +48,7 @@ extension SidebarSection {
         case .privacy: .privacy
         case .maintenance: .maintenance
         case .memory: .memory
+        case .heat: .heat
         case .loginItems: .loginItems
         case .uninstaller: .uninstaller
         case .updater: .updater
@@ -135,8 +137,8 @@ final class AuroraView: NSView {
         CATransaction.begin()
         CATransaction.setAnimationDuration(0.8)
         CATransaction.setDisableActions(self.paused || paused)
-        first.colors = glowColors(primary, strength: 0.42)
-        second.colors = glowColors(secondary, strength: 0.30)
+        first.colors = glowColors(primary, strength: 0.20)
+        second.colors = glowColors(secondary, strength: 0.13)
         CATransaction.commit()
         if moving != self.moving {
             self.moving = moving
@@ -242,7 +244,7 @@ struct ModuleGlyph: View {
             .fill(theme.gradient)
             .overlay(
                 RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                    .fill(LinearGradient(colors: [.white.opacity(0.35), .clear], startPoint: .top, endPoint: .center))
+                    .fill(LinearGradient(colors: [.white.opacity(0.18), .clear], startPoint: .top, endPoint: .center))
             )
             .overlay(
                 Image(systemName: symbol ?? theme.glyph)
@@ -251,7 +253,7 @@ struct ModuleGlyph: View {
                     .shadow(color: .black.opacity(0.18), radius: size * 0.04, y: size * 0.02)
             )
             .frame(width: size, height: size)
-            .shadow(color: theme.primary.opacity(0.55), radius: size * 0.28, y: size * 0.1)
+            .shadow(color: .black.opacity(0.22), radius: size * 0.06, y: size * 0.03)
     }
 }
 
@@ -266,7 +268,7 @@ struct HeroGlyph: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(RadialGradient(colors: [theme.primary.opacity(0.55), .clear], center: .center, startRadius: 0, endRadius: size * 0.75))
+                .fill(RadialGradient(colors: [theme.primary.opacity(0.14), .clear], center: .center, startRadius: 0, endRadius: size * 0.75))
                 .frame(width: size * 1.5, height: size * 1.5)
             // One turn every 40 seconds needs only a few frames a second.
             TimelineView(.animation(minimumInterval: 1.0 / 12, paused: reduceMotion || ambientPaused)) { context in
@@ -274,7 +276,7 @@ struct HeroGlyph: View {
                 ZStack {
                     ForEach(0..<2, id: \.self) { ring in
                         Ellipse()
-                            .strokeBorder(LinearGradient(colors: [theme.colors[0].opacity(0.7), .clear, theme.secondary.opacity(0.7)],
+                            .strokeBorder(LinearGradient(colors: [theme.colors[0].opacity(0.4), .clear, theme.secondary.opacity(0.4)],
                                                          startPoint: .leading, endPoint: .trailing), lineWidth: 1.2)
                             .frame(width: size * (1.18 + Double(ring) * 0.22), height: size * (0.46 + Double(ring) * 0.1))
                             .rotationEffect(.degrees((ring == 0 ? -18 : 24) + turn * (ring == 0 ? 1 : -1)))
@@ -283,10 +285,10 @@ struct HeroGlyph: View {
             }
             Circle()
                 .fill(theme.gradient)
-                .overlay(Circle().fill(LinearGradient(colors: [.white.opacity(0.4), .clear], startPoint: .top, endPoint: .center)))
-                .overlay(Circle().strokeBorder(.white.opacity(0.25), lineWidth: 1))
+                .overlay(Circle().fill(LinearGradient(colors: [.white.opacity(0.2), .clear], startPoint: .top, endPoint: .center)))
+                .overlay(Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1))
                 .frame(width: size * 0.72, height: size * 0.72)
-                .shadow(color: theme.primary.opacity(0.7), radius: size * 0.2)
+                .shadow(color: .black.opacity(0.3), radius: size * 0.06, y: size * 0.03)
             Image(systemName: theme.glyph)
                 .font(.system(size: size * 0.3, weight: .semibold))
                 .foregroundStyle(.white)
@@ -390,10 +392,10 @@ struct PrimaryPillStyle: ButtonStyle {
             .padding(.vertical, large ? 13 : 8)
             .background {
                 Capsule().fill(theme.gradient)
-                    .overlay(Capsule().fill(LinearGradient(colors: [.white.opacity(0.28), .clear], startPoint: .top, endPoint: .center)))
+                    .overlay(Capsule().fill(LinearGradient(colors: [.white.opacity(0.15), .clear], startPoint: .top, endPoint: .center)))
                     .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 1))
             }
-            .shadow(color: theme.primary.opacity(isEnabled ? 0.55 : 0), radius: large ? 18 : 10, y: large ? 8 : 4)
+            .shadow(color: .black.opacity(isEnabled ? 0.25 : 0), radius: large ? 6 : 4, y: large ? 3 : 2)
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .opacity(isEnabled ? 1 : 0.45)
             .animation(.spring(duration: 0.25, bounce: 0.4), value: configuration.isPressed)
@@ -443,15 +445,15 @@ private struct OrbButtonBody: View {
             TimelineView(.animation(minimumInterval: 1.0 / 20, paused: reduceMotion || ambientPaused)) { context in
                 let breathe = reduceMotion ? 0.5 : (1 - cos(context.date.timeIntervalSinceReferenceDate * .pi / 2.2)) / 2
                 Circle()
-                    .fill(theme.primary.opacity(0.2))
+                    .fill(theme.primary.opacity(0.07))
                     .frame(width: size * 1.32, height: size * 1.32)
-                    .scaleEffect(0.95 + 0.12 * breathe)
+                    .scaleEffect(0.96 + 0.06 * breathe)
             }
             Circle()
                 .fill(theme.gradient)
-                .overlay(Circle().fill(LinearGradient(colors: [.white.opacity(0.38), .clear], startPoint: .top, endPoint: .center)))
-                .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 1.5))
-                .shadow(color: theme.primary.opacity(0.75), radius: 26, y: 10)
+                .overlay(Circle().fill(LinearGradient(colors: [.white.opacity(0.18), .clear], startPoint: .top, endPoint: .center)))
+                .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 1))
+                .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
                 .frame(width: size, height: size)
             configuration.label
                 .font(.system(size: size * 0.17, weight: .bold, design: .rounded))
@@ -489,7 +491,7 @@ struct HealthRing: View {
         let color = health?.status.color ?? .white.opacity(0.4)
         let fraction = Double(health?.score ?? 0) / 100
         ZStack {
-            Circle().fill(RadialGradient(colors: [color.opacity(0.35), .clear], center: .center, startRadius: 0, endRadius: size * 0.7))
+            Circle().fill(RadialGradient(colors: [color.opacity(0.07), .clear], center: .center, startRadius: 0, endRadius: size * 0.7))
                 .frame(width: size * 1.35, height: size * 1.35)
             Circle().stroke(.white.opacity(0.08), lineWidth: 12)
                 .frame(width: size - 12, height: size - 12)
@@ -499,7 +501,6 @@ struct HealthRing: View {
                         style: StrokeStyle(lineWidth: 12, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .frame(width: size - 12, height: size - 12)
-                .shadow(color: color.opacity(0.8), radius: 10)
             VStack(spacing: 2) {
                 if let health {
                     Text("\(health.score)")

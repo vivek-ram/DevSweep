@@ -5,17 +5,75 @@ import SwiftUI
 struct MenuBarLabel: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
+    @State private var sampling = false
 
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: model.idleBytes > 0 ? "sparkles" : "sparkle")
-            if model.settings.menuBarShowsFreeSpace, let disk = model.disk {
-                Text(Format.bytes(disk.available)).monospacedDigit()
+        let stats = model.settings.menuBarStats
+        Group {
+            if stats.isEmpty {
+                Image(systemName: model.idleBytes > 0 ? "sparkles" : "sparkle")
+            } else {
+                // The status item shows one image, so the icon and readouts are drawn into it.
+                Image(nsImage: MenuBarReadout.image(icon: model.idleBytes > 0 ? "sparkles" : "sparkle",
+                                                    items: stats.map { ($0.symbol, value(for: $0)) }))
             }
         }
         .onAppear {
             model.openMainWindow = { openWindow(id: "main") }
+            updateSampling()
         }
+        .onChange(of: stats) { updateSampling() }
+    }
+
+    private func value(for stat: MenuBarStat) -> String {
+        let now = model.monitor.current
+        switch stat {
+        case .temperature: return formatTemperature(model.monitor.thermal.cpu)
+        case .cpu: return now.memoryTotal > 0 ? "\(Int((now.cpu * 100).rounded()))%" : "—"
+        case .memory:
+            return now.memoryTotal > 0 ? "\(Int((Double(now.memoryUsed) / Double(now.memoryTotal) * 100).rounded()))%" : "—"
+        case .freeSpace: return model.disk.map { MenuBarReadout.shortBytes($0.available) } ?? "—"
+        }
+    }
+
+    /// Keeps a slow sampler running while any live readout is shown.
+    private func updateSampling() {
+        let needed = model.settings.menuBarStats.contains(where: \.isLive)
+        guard needed != sampling else { return }
+        sampling = needed
+        if needed { model.monitor.start(slow: true) } else { model.monitor.stop(slow: true) }
+    }
+}
+
+/// Draws the menu bar's icon and readouts as one template image (it takes the menu bar's colour).
+@MainActor
+enum MenuBarReadout {
+    static func image(icon: String, items: [(symbol: String, value: String)]) -> NSImage {
+        let content = HStack(spacing: 7) {
+            Image(systemName: icon).font(.system(size: 13, weight: .medium))
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                HStack(spacing: 2) {
+                    Image(systemName: item.symbol).font(.system(size: 10, weight: .semibold))
+                    Text(item.value).font(.system(size: 12, weight: .medium)).monospacedDigit()
+                }
+            }
+        }
+        .foregroundStyle(.black)
+        .padding(.horizontal, 1)
+        .frame(height: 18)
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        let image = renderer.nsImage ?? NSImage(systemSymbolName: icon, accessibilityDescription: "DevSweep") ?? NSImage()
+        image.isTemplate = true
+        return image
+    }
+
+    /// "61G", "980M": short enough for the menu bar.
+    static func shortBytes(_ bytes: Int64) -> String {
+        let gb = Double(bytes) / 1_000_000_000
+        if gb >= 100 { return "\(Int(gb))G" }
+        if gb >= 1 { return String(format: "%.0fG", gb) }
+        return "\(Int(Double(bytes) / 1_000_000))M"
     }
 }
 
@@ -175,7 +233,7 @@ struct SystemGauges: View {
     @State private var detail: Detail?
     @State private var watching = false
 
-    enum Detail { case cpu, memory }
+    enum Detail { case cpu, memory, heat }
 
     init(showing: Detail? = nil) {
         _detail = State(initialValue: showing)
@@ -195,9 +253,12 @@ struct SystemGauges: View {
                           selected: detail == .memory) { toggle(.memory) }
                 }
                 GridRow {
-                    let peak = max(monitor.networkHistory.max() ?? 1, 1)
-                    Gauge(title: "Network", value: "↓\(rate(now.networkIn))", fraction: (now.networkIn + now.networkOut) / peak, tint: .blue,
-                          history: monitor.networkHistory.map { $0 / peak }, caption: "↑\(rate(now.networkOut))")
+                    let thermal = monitor.thermal
+                    Gauge(title: "Temperature", value: thermal.cpu.map { "\(Int($0.rounded()))°C" } ?? thermal.state.title,
+                          fraction: thermal.cpu.map { min(1, max(0, ($0 - 20) / 90)) } ?? 0,
+                          tint: thermal.cpu.map(temperatureColor) ?? thermal.state.color,
+                          history: monitor.temperatureHistory.map { min(1, max(0, ($0 - 20) / 90)) },
+                          caption: thermal.state.title, selected: detail == .heat) { toggle(.heat) }
                     if let battery = now.battery {
                         Gauge(title: "Battery", value: "\(battery.percent)%", fraction: Double(battery.percent) / 100,
                               tint: battery.percent <= 10 && !battery.onPower ? .red : .green,
@@ -207,9 +268,16 @@ struct SystemGauges: View {
                         Gauge(title: "Swap", value: Format.bytes(now.swapUsed), fraction: 0, tint: .gray, caption: "virtual memory")
                     }
                 }
+                GridRow {
+                    let peak = max(monitor.networkHistory.max() ?? 1, 1)
+                    Gauge(title: "Network", value: "↓\(rate(now.networkIn))  ↑\(rate(now.networkOut))",
+                          fraction: (now.networkIn + now.networkOut) / peak, tint: .blue,
+                          history: monitor.networkHistory.map { $0 / peak })
+                        .gridCellColumns(2)
+                }
             }
             if let detail {
-                TopAppsPanel(byCPU: detail == .cpu)
+                TopAppsPanel(metric: detail == .cpu ? .cpu : detail == .heat ? .power : .memory)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
@@ -248,16 +316,17 @@ struct SystemGauges: View {
 /// The five apps using the most CPU or memory, with Quit buttons.
 private struct TopAppsPanel: View {
     @Environment(AppModel.self) private var model
-    let byCPU: Bool
+    let metric: UsageMetric
 
     var body: some View {
-        let apps = model.processes.top(by: byCPU, limit: 5)
+        let apps = model.processes.top(by: metric, limit: 5)
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(byCPU ? "BUSIEST APPS" : "USING THE MOST MEMORY").font(.caption2.weight(.bold)).tracking(1).foregroundStyle(.secondary)
+                Text(metric == .cpu ? "BUSIEST APPS" : metric == .power ? "HEATING YOUR MAC" : "USING THE MOST MEMORY")
+                    .font(.caption2.weight(.bold)).tracking(1).foregroundStyle(.secondary)
                 Spacer()
                 Button("Show All") {
-                    model.section = .memory
+                    model.section = metric == .power ? .heat : .memory
                     model.showMainWindow()
                 }
                 .buttonStyle(.link).font(.caption)
@@ -268,7 +337,7 @@ private struct TopAppsPanel: View {
                     .padding(8)
             }
             ForEach(apps) { app in
-                AppUsageRow(app: app, byCPU: byCPU, fraction: 0, compact: true)
+                AppUsageRow(app: app, metric: metric, fraction: 0, compact: true)
             }
         }
         .padding(.bottom, 4)

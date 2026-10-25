@@ -15,13 +15,16 @@ public struct AppUsage: Identifiable, Sendable, Equatable {
     /// Share of one core (1.0 = one core fully busy).
     public var cpu: Double
     public var processCount: Int
+    /// Power drawn right now, in watts, from the energy macOS accounts to each process. This is
+    /// what heats the Mac up; 0 where macOS doesn't report energy.
+    public var watts: Double = 0
 }
 
 /// Samples every process this user can read and groups them by app. CPU is a rate, so keep
 /// one sampler and call `sample()` on a timer.
 public final class ProcessSampler: @unchecked Sendable {
     private let lock = NSLock()
-    private var lastCPU: [Int32: (cpu: UInt64, wall: UInt64)] = [:]
+    private var lastCPU: [Int32: (cpu: UInt64, energy: UInt64, wall: UInt64)] = [:]
     private var bundleNames: [String: String] = [:]
     private let timebase: (numer: UInt64, denom: UInt64) = {
         var info = mach_timebase_info_data_t()
@@ -36,16 +39,19 @@ public final class ProcessSampler: @unchecked Sendable {
         defer { lock.unlock() }
         let now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
         var groups: [String: AppUsage] = [:]
-        var seen: [Int32: (cpu: UInt64, wall: UInt64)] = [:]
+        var seen: [Int32: (cpu: UInt64, energy: UInt64, wall: UInt64)] = [:]
 
         for pid in Self.allPIDs() where pid > 0 {
             guard let usage = Self.rusage(pid) else { continue }   // other users' and system processes
             // proc_pid_rusage reports CPU time in mach ticks on Apple silicon.
             let cpuTime = (usage.ri_user_time + usage.ri_system_time) * timebase.numer / timebase.denom
-            seen[pid] = (cpuTime, now)
+            seen[pid] = (cpuTime, usage.ri_energy_nj, now)
             var cpu = 0.0
-            if let last = lastCPU[pid], now > last.wall, cpuTime >= last.cpu {
-                cpu = Double(cpuTime - last.cpu) / Double(now - last.wall)
+            var watts = 0.0
+            if let last = lastCPU[pid], now > last.wall {
+                let seconds = Double(now - last.wall) / 1e9
+                if cpuTime >= last.cpu { cpu = Double(cpuTime - last.cpu) / Double(now - last.wall) }
+                if usage.ri_energy_nj >= last.energy { watts = Double(usage.ri_energy_nj - last.energy) / 1e9 / seconds }
             }
 
             let owner = Self.responsiblePID(pid) ?? pid
@@ -56,6 +62,7 @@ public final class ProcessSampler: @unchecked Sendable {
                                                 pid: owner, memory: 0, cpu: 0, processCount: 0)
             group.memory += Int64(usage.ri_phys_footprint)
             group.cpu += cpu
+            group.watts += watts
             group.processCount += 1
             if pid == owner { group.pid = pid }
             groups[key] = group
@@ -85,10 +92,10 @@ public final class ProcessSampler: @unchecked Sendable {
         return Array(pids.prefix(Int(max(filled, 0))))
     }
 
-    static func rusage(_ pid: Int32) -> rusage_info_v2? {
-        var info = rusage_info_v2()
+    static func rusage(_ pid: Int32) -> rusage_info_v6? {
+        var info = rusage_info_v6()
         let result = withUnsafeMutablePointer(to: &info) { pointer in
-            pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V2, $0) }
+            pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V6, $0) }
         }
         return result == 0 ? info : nil
     }

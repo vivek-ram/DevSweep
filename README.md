@@ -41,8 +41,10 @@ packages to `requirements.txt` before a virtual environment goes.
   and cleans Xcode, Homebrew, Docker, Ollama, nvm and Rust leftovers with each tool's own commands.
 - **Safe by default:** everything goes to the Trash, your code is never touched, and virtual
   environments are only removed after you tick them.
-- **Native and light:** SwiftUI, around 14 MB, no Electron. In the background it uses about 0% CPU,
-  because its animations pause whenever the window is hidden or you're in another app.
+- **Temperature and widgets:** see how hot your Mac is and which apps are heating it, live in
+  the menu bar or on desktop widgets.
+- **Native and light:** SwiftUI, no Electron. In the background it uses about 0% CPU, because its
+  animations pause whenever the window is hidden or you're in another app.
 - **Private:** no account, no analytics, no telemetry. The only network requests are the update
   checks you start.
 
@@ -80,6 +82,11 @@ first.
 - **Memory:** live memory use broken down into apps, wired, compressed, cached files and swap, plus
   the apps using the most memory or CPU. Helper processes and browser tabs count toward their app,
   and every app gets a Quit button. *Free Up Memory* asks macOS to drop cached memory.
+- **Temperature:** the CPU temperature and macOS's thermal state (cool, warm, hot), a live chart,
+  the hottest sensor in each part of the Mac (CPU cores, chip, graphics, Neural Engine, SSD,
+  battery), and the apps heating it up. Apps don't have a temperature of their own, so they're
+  ranked by the power each one draws, in watts, as macOS accounts it per process. That's what
+  makes the chip hot.
 - **Login Items:** background agents and daemons with on/off switches. Ones whose program no
   longer exists are flagged.
 
@@ -120,8 +127,20 @@ first.
 - **Space history:** a 30-day free-space chart, plus a notification when a folder suddenly grows.
 
 ### Menu bar
-Free space, CPU, memory pressure, network and battery health at a glance. Click CPU or Memory to see
-the apps behind the number, eject connected drives, and get a nudge when the Trash fills up.
+Free space, CPU, memory, temperature, network and battery health at a glance. Click CPU, Memory or
+Temperature to see the apps behind the number, eject connected drives, and get a nudge when the
+Trash fills up. You can also show live readouts right in the menu bar (temperature, CPU, memory
+and free space; pick them in *Settings → Automation*):
+
+<p align="center"><img src="docs/screenshots/menubar-readout.png" alt="Menu bar readout" width="520"></p>
+
+### Desktop widgets
+Mac Health, Storage and Temperature widgets in small, medium and large sizes, for the desktop or
+Notification Center. Right-click the desktop, choose **Edit Widgets…** and search for DevSweep.
+Clicking a widget opens that page in DevSweep. They refresh after every scan or clean and every
+few minutes while placed; macOS limits how often widgets redraw, so for live numbers use the menu bar.
+
+<p align="center"><img src="docs/screenshots/widgets.png" alt="Desktop widgets" width="880"></p>
 
 ## Screenshots
 
@@ -130,14 +149,19 @@ the apps behind the number, eject connected drives, and get a nudge when the Tra
 | ![Smart Scan, scanning](docs/screenshots/scanning.png) **Smart Scan** while scanning | ![Cleaning done](docs/screenshots/cleaning-done.png) **Cleaning**, with a live progress ring and confetti |
 | ![System Junk](docs/screenshots/junk.png) **System Junk** | ![Projects](docs/screenshots/projects.png) **Projects**: idle, active and protected |
 | ![Storage Map](docs/screenshots/storage-map.png) **Storage Map** | ![Large Files](docs/screenshots/large-files.png) **Large Files** |
-| ![Memory](docs/screenshots/memory.png) **Memory** | ![Privacy](docs/screenshots/privacy.png) **Privacy** |
+| ![Memory](docs/screenshots/memory.png) **Memory** | ![Temperature](docs/screenshots/temperature.png) **Temperature** |
+| ![Privacy](docs/screenshots/privacy.png) **Privacy** | ![Screen Cleaning](docs/screenshots/screen-cleaning.png) **Screen & Keyboard Cleaning** |
 | ![Uninstaller](docs/screenshots/uninstaller.png) **Uninstaller** | ![Updater](docs/screenshots/updater.png) **Updater** |
 | ![Duplicates](docs/screenshots/duplicates.png) **Duplicates** | ![Cloud Cleanup](docs/screenshots/cloud.png) **Cloud Cleanup** |
 | ![Maintenance](docs/screenshots/maintenance.png) **Maintenance** | ![Login Items](docs/screenshots/login-items.png) **Login Items** |
 | ![Developer Caches](docs/screenshots/caches.png) **Developer Caches** | ![Toolchains & Models](docs/screenshots/devtools.png) **Toolchains & Models** |
 | ![Auto-Clean](docs/screenshots/auto-clean.png) **Auto-Clean** | ![My Activity](docs/screenshots/activity.png) **My Activity** |
 
-<p align="center"><img src="docs/screenshots/menubar.png" alt="Menu bar panel" width="300"><br><b>Menu bar</b></p>
+<p align="center">
+<img src="docs/screenshots/menubar.png" alt="Menu bar panel" width="290">&nbsp;&nbsp;
+<img src="docs/screenshots/menubar-heat.png" alt="Menu bar panel, heat" width="290"><br>
+<b>Menu bar</b>: click a gauge to see the apps behind it
+</p>
 
 ## Install
 
@@ -214,7 +238,7 @@ devsweep clean ~/Developer --yes --include-venvs   # …venvs too, packages save
 devsweep snapshot path/to/.venv                    # print a venv as requirements.txt
 devsweep caches | storage | junk | dupes | tools   # caches, disk usage, junk, duplicates, toolchains
 devsweep apps | leftovers | login-items            # apps, leftovers, background items
-devsweep top | stats | maintenance                 # memory & CPU hogs, system stats, purgeable space
+devsweep top | heat | stats | maintenance          # memory & CPU hogs, temperatures, system stats, purgeable space
 devsweep privacy | updates | cloud | downloads     # browser traces, updates, cloud copies, downloads
 ```
 
@@ -228,9 +252,13 @@ git clone https://github.com/vivek-ram/DevSweep.git
 cd DevSweep
 scripts/build-app.sh             # → build/DevSweep.app
 scripts/build-app.sh --install   # …and copy it to /Applications and open it
-scripts/make-dmg.sh              # → build/DevSweep-<version>.dmg
+scripts/make-dmg.sh              # → build/DevSweep-<version>.dmg (Apple silicon + Intel)
 scripts/test.sh                  # unit tests (Swift Testing)
 ```
+
+The build signs with your **Developer ID Application** certificate when you have one (or whatever
+`SIGN_IDENTITY` names) and falls back to ad-hoc signing. Everything works ad-hoc except the
+desktop widgets: macOS only runs a sandboxed widget extension whose signature carries a Team ID.
 
 Regenerate the screenshots from demo data with:
 
@@ -245,7 +273,8 @@ swift build && .build/debug/DevSweep --render-demo docs/screenshots
 | `Sources/DevSweepCore` | Everything that reads or changes the disk, with no UI: the project scanner and retention rules, venv/Node snapshots, the cleaner, storage and junk scanners, duplicates and similar photos, privacy, maintenance, updates, process and system sampling, and Mac Health. |
 | `Sources/DevSweep` | The SwiftUI app: one `@Observable` store per module, the views, the theme (module colours, glass cards, the Core Animation background) and the menu bar extra. |
 | `Sources/devsweep-cli` | The command-line tool. |
-| `Tests/DevSweepCoreTests` | 70 tests on temporary fixture folders, covering scanning, retention, snapshots, cleaning safety, junk rules, privacy, health, updates and more. |
+| `Sources/DevSweepWidgets`, `Sources/DevSweepWidgetUI` | The WidgetKit extension and its views. The extension is sandboxed and only reads a snapshot the app writes to `~/Library/Application Support/DevSweep/Widget`. |
+| `Tests/DevSweepCoreTests` | 74 tests on temporary fixture folders, covering scanning, retention, snapshots, cleaning safety, junk rules, privacy, health, temperature, updates and more. |
 
 Some details:
 
@@ -254,7 +283,12 @@ Some details:
 - Sizes are what removal actually frees: allocated blocks, with hard-linked files (pnpm, uv)
   counted only when every link is inside the folder.
 - Memory per app sums each process's physical footprint and groups helpers by the app macOS holds
-  responsible for them.
+  responsible for them. Power per app comes from the energy macOS accounts to each process.
+- Temperatures are read from the Mac's own sensors through IOKit's HID event system, the way
+  macOS's tools do; Intel Macs that don't expose them still show the thermal state.
+- The SwiftPM-built widget extension is linked with `NSExtensionMain` as its entry point, as Xcode
+  does. Entered at `main`, WidgetKit sets up and returns, and the extension exits before macOS can
+  talk to it.
 
 ## What it doesn't do (and why)
 

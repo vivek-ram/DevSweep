@@ -8,7 +8,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case overview
     case junk, cloud
     case privacy
-    case maintenance, memory, loginItems
+    case maintenance, memory, heat, loginItems
     case uninstaller, updater
     case storageMap, largeFiles, duplicates
     case projects, caches, devTools
@@ -24,6 +24,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .privacy: "Privacy"
         case .maintenance: "Maintenance"
         case .memory: "Memory"
+        case .heat: "Temperature"
         case .loginItems: "Login Items"
         case .uninstaller: "Uninstaller"
         case .updater: "Updater"
@@ -44,7 +45,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         (nil, [.overview]),
         ("Cleanup", [.junk, .cloud]),
         ("Protection", [.privacy]),
-        ("Performance", [.maintenance, .memory, .loginItems]),
+        ("Performance", [.maintenance, .memory, .heat, .loginItems]),
         ("Applications", [.uninstaller, .updater]),
         ("My Clutter", [.storageMap, .largeFiles, .duplicates]),
         ("Developer", [.projects, .caches, .devTools]),
@@ -305,6 +306,7 @@ final class AppModel {
         lastScanDuration = result.duration
         selectedProjects = selectedProjects.filter { id in projects.contains { $0.id == id } }
         store.saveScan(result)
+        WidgetPublisher.shared.publish(soon: true)
     }
 
     // MARK: Smart Scan
@@ -366,6 +368,7 @@ final class AppModel {
             junkSelection = Set(items.filter(\.suggested).map(\.path))
             junkScannedAt = Date()
             isScanningJunk = false
+            WidgetPublisher.shared.publish(soon: true)
         }
     }
 
@@ -459,6 +462,7 @@ final class AppModel {
 
     /// Ends the panel with a summary (and confetti), or shows a banner when there was no panel.
     func finishCleaning(_ records: [CleanupRecord], movedToTrash: Bool, extra: [String] = []) {
+        WidgetPublisher.shared.publish(soon: true)
         let freed = records.filter { $0.outcome == .removed }.reduce(0) { $0 + $1.bytes }
         let problems = records.filter { $0.outcome != .removed }
         var detail = extra
@@ -673,6 +677,13 @@ final class AppModel {
 
     func toggleProtection(_ project: Project) {
         settings.toggleProtection(project.path)
+    }
+
+    /// Opens a page from a devsweep://<page> link (the widgets use these).
+    func open(_ url: URL) {
+        guard url.scheme == "devsweep" else { return }
+        if let host = url.host(), let target = SidebarSection(rawValue: host) { section = target }
+        showMainWindow()
     }
 
     func showMainWindow() {

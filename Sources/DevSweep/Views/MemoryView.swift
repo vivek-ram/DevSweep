@@ -5,7 +5,7 @@ import SwiftUI
 /// What's using memory and CPU right now, and which apps to quit to get it back.
 struct MemoryView: View {
     @Environment(AppModel.self) private var model
-    @State private var byCPU = false
+    @State private var metric = UsageMetric.memory
     let theme = ModuleTheme.memory
 
     var body: some View {
@@ -38,7 +38,7 @@ struct MemoryView: View {
                 }
                 .appearIn(delay: 0.06)
 
-                TopAppsCard(byCPU: $byCPU)
+                TopAppsCard(metric: $metric)
                     .appearIn(delay: 0.12)
             }
             .padding(28)
@@ -83,18 +83,10 @@ private struct MemoryRingCard: View {
         let fraction = now.memoryTotal > 0 ? Double(now.memoryUsed) / Double(now.memoryTotal) : 0
         VStack(spacing: 14) {
             ZStack {
-                Circle().fill(RadialGradient(colors: [now.pressure.color.opacity(0.25), .clear], center: .center, startRadius: 0, endRadius: 120))
+                Circle().fill(RadialGradient(colors: [now.pressure.color.opacity(0.06), .clear], center: .center, startRadius: 0, endRadius: 120))
                     .frame(width: 230, height: 230)
                 Circle().stroke(.white.opacity(0.08), lineWidth: 14)
                     .frame(width: 168, height: 168)
-                // The numbers change every two seconds, so the arc only follows the monitor's short
-                // ease, and its glow is a still blur behind it rather than a shadow redrawn each frame.
-                Circle()
-                    .stroke((now.pressure == .normal ? ModuleTheme.memory.primary : now.pressure.color).opacity(0.35), lineWidth: 22)
-                    .frame(width: 168, height: 168)
-                    .padding(40)          // room for the blur, so it isn't cut off square
-                    .blur(radius: 14)
-                    .drawingGroup()
                 Circle()
                     .trim(from: 0, to: fraction)
                     .stroke(now.pressure == .normal ? AnyShapeStyle(ModuleTheme.memory.gradient) : AnyShapeStyle(now.pressure.color),
@@ -111,7 +103,7 @@ private struct MemoryRingCard: View {
             }
             .frame(height: 190)
             HStack(spacing: 6) {
-                Circle().fill(now.pressure.color).frame(width: 8, height: 8).shadow(color: now.pressure.color, radius: 4)
+                Circle().fill(now.pressure.color).frame(width: 8, height: 8)
                 Text("Pressure: \(now.pressure.title)").font(.callout.weight(.medium))
             }
             .padding(.horizontal, 12).padding(.vertical, 6)
@@ -191,25 +183,67 @@ private struct MemoryBreakdownCard: View {
     }
 }
 
-private struct TopAppsCard: View {
+/// What a "top apps" list is ranked by.
+enum UsageMetric: CaseIterable {
+    case memory, cpu, power
+
+    var title: String {
+        switch self {
+        case .memory: "Memory"
+        case .cpu: "CPU"
+        case .power: "Power"
+        }
+    }
+
+    func value(_ app: AppUsage) -> Double {
+        switch self {
+        case .memory: Double(app.memory)
+        case .cpu: app.cpu
+        case .power: app.watts
+        }
+    }
+
+    func format(_ app: AppUsage) -> String {
+        switch self {
+        case .memory: Format.bytes(app.memory)
+        case .cpu: "\(Int((app.cpu * 100).rounded()))%"
+        case .power: app.watts >= 10 ? String(format: "%.0f W", app.watts) : String(format: "%.1f W", app.watts)
+        }
+    }
+
+    /// The other numbers worth showing under the main one.
+    func secondary(_ app: AppUsage) -> String {
+        switch self {
+        case .memory: "\(Int((app.cpu * 100).rounded()))% CPU"
+        case .cpu: Format.bytes(app.memory)
+        case .power: "\(Int((app.cpu * 100).rounded()))% CPU"
+        }
+    }
+}
+
+struct TopAppsCard: View {
     @Environment(AppModel.self) private var model
-    @Binding var byCPU: Bool
+    @Binding var metric: UsageMetric
+    var choices: [UsageMetric] = [.memory, .cpu]
+    var title: String? = nil
+    var tint: ModuleTheme = .memory
 
     var body: some View {
         let store = model.processes
-        let apps = store.top(by: byCPU, limit: 12)
-        let largest = byCPU ? max(apps.first?.cpu ?? 1, 0.01) : Double(max(apps.first?.memory ?? 1, 1))
+        let apps = store.top(by: metric, limit: 12)
+        let largest = max(apps.first.map(metric.value) ?? 1, metric == .memory ? 1 : 0.01)
         Card(padding: 0) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    CardTitle(title: byCPU ? "Busiest apps" : "Apps using the most memory",
+                    CardTitle(title: title ?? (metric == .cpu ? "Busiest apps" : metric == .power ? "Apps heating your Mac" : "Apps using the most memory"),
                               subtitle: "Helper processes, browser tabs and tools an app started count toward it.")
                     Spacer()
-                    Picker("", selection: $byCPU) {
-                        Text("Memory").tag(false)
-                        Text("CPU").tag(true)
+                    if choices.count > 1 {
+                        Picker("", selection: $metric) {
+                            ForEach(choices, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
                     }
-                    .pickerStyle(.segmented).labelsHidden().fixedSize()
                 }
                 .padding(16)
                 if apps.isEmpty {
@@ -217,7 +251,7 @@ private struct TopAppsCard: View {
                         .padding(16)
                 }
                 ForEach(apps) { app in
-                    AppUsageRow(app: app, byCPU: byCPU, fraction: byCPU ? app.cpu / largest : Double(app.memory) / largest)
+                    AppUsageRow(app: app, metric: metric, fraction: metric.value(app) / largest, tint: tint)
                     if app.id != apps.last?.id { Divider().opacity(0.4).padding(.leading, 60) }
                 }
             }
@@ -230,8 +264,9 @@ private struct TopAppsCard: View {
 struct AppUsageRow: View {
     @Environment(AppModel.self) private var model
     let app: AppUsage
-    var byCPU: Bool
+    var metric: UsageMetric
     var fraction: Double
+    var tint: ModuleTheme = .memory
     var compact = false
     @State private var hovering = false
 
@@ -251,7 +286,7 @@ struct AppUsageRow: View {
                     GeometryReader { geo in
                         Capsule().fill(.white.opacity(0.06))
                             .overlay(alignment: .leading) {
-                                Capsule().fill(ModuleTheme.memory.gradient)
+                                Capsule().fill(tint.gradient)
                                     .frame(width: max(3, geo.size.width * min(1, fraction)))
                             }
                     }
@@ -260,10 +295,10 @@ struct AppUsageRow: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 1) {
-                Text(byCPU ? "\(Int((app.cpu * 100).rounded()))%" : Format.bytes(app.memory))
+                Text(metric.format(app))
                     .font((compact ? Font.callout : .body).weight(.semibold)).monospacedDigit()
                 if !compact {
-                    Text(byCPU ? Format.bytes(app.memory) : "\(Int((app.cpu * 100).rounded()))% CPU")
+                    Text(metric.secondary(app))
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
             }

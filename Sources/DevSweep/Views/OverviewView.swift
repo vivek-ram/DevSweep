@@ -71,7 +71,7 @@ private struct SmartScanHero: View {
             ZStack {
                 GlassBackground(cornerRadius: 28)
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(RadialGradient(colors: [theme.primary.opacity(scanning ? 0.32 : 0.2), .clear],
+                    .fill(RadialGradient(colors: [theme.primary.opacity(scanning ? 0.12 : 0.07), .clear],
                                          center: .leading, startRadius: 0, endRadius: 520))
                 SparkleField(active: scanning || celebrating)
                     .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -99,7 +99,7 @@ private struct SmartScanHero: View {
     @ViewBuilder private var visual: some View {
         if scanning {
             ZStack {
-                Circle().fill(RadialGradient(colors: [theme.primary.opacity(0.5), .clear], center: .center, startRadius: 0, endRadius: 120))
+                Circle().fill(RadialGradient(colors: [theme.primary.opacity(0.15), .clear], center: .center, startRadius: 0, endRadius: 120))
                 ScanningOrb(size: 170, tint: .white)
             }
             .transition(.scale(scale: 0.85).combined(with: .opacity))
@@ -348,7 +348,7 @@ private struct ModuleTile: View {
                 ZStack {
                     GlassBackground(cornerRadius: 20)
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(RadialGradient(colors: [theme.primary.opacity(hovering ? 0.3 : 0.16), .clear],
+                        .fill(RadialGradient(colors: [theme.primary.opacity(hovering ? 0.12 : 0.06), .clear],
                                              center: .topLeading, startRadius: 0, endRadius: 220))
                 }
             }
@@ -375,7 +375,7 @@ private struct HealthCard: View {
                     CardTitle(title: "Mac Health", subtitle: model.health.map { "\($0.score) of 100 · \($0.status.title)" } ?? "Measured after a scan")
                     Spacer()
                     if let health = model.health {
-                        Circle().fill(health.status.color).frame(width: 10, height: 10).shadow(color: health.status.color, radius: 6)
+                        Circle().fill(health.status.color).frame(width: 10, height: 10)
                     }
                 }
                 let factors = model.health?.factors.sorted { $0.penalty > $1.penalty } ?? []

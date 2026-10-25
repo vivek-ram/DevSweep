@@ -1,7 +1,9 @@
 #if DEBUG
 import AppKit
 import DevSweepCore
+import DevSweepWidgetUI
 import SwiftUI
+import WidgetKit
 
 /// Debug aid: renders each screen to a PNG without needing screen-recording permission.
 ///   DevSweep --render-screens <output-dir> <folder-to-scan>...
@@ -349,6 +351,62 @@ enum ScreenRenderer {
         model.spaceHistory = history
     }
 
+    /// The desktop widgets on a wallpaper-like background, filled from the demo data.
+    static func widgetGallery() -> some View {
+        let model = AppModel.shared
+        let iconFolder = NSTemporaryDirectory() + "devsweep-demo-icons"
+        try? FileManager.default.createDirectory(atPath: iconFolder, withIntermediateDirectories: true)
+        func iconFile(_ bundle: String?) -> String? {
+            guard let bundle else { return nil }
+            let path = iconFolder + "/" + (bundle as NSString).lastPathComponent + ".png"
+            let image = NSWorkspace.shared.icon(forFile: bundle)
+            image.size = NSSize(width: 64, height: 64)
+            guard let tiff = image.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return nil }
+            try? png.write(to: URL(fileURLWithPath: path))
+            return path
+        }
+        let thermal = model.monitor.thermal
+        let health = model.health
+        let snapshot = WidgetSnapshot(
+            date: Date().addingTimeInterval(-120), healthScore: health?.score, healthStatus: health?.status.rawValue,
+            freeBytes: model.disk?.available ?? 0, totalBytes: model.disk?.total ?? 0, junkBytes: model.suggestedJunkBytes,
+            idleProjectBytes: model.idleBytes, idleProjects: model.idleProjects.count, updates: model.updater.updates.count,
+            memoryUsed: model.monitor.current.memoryUsed, memoryTotal: model.monitor.current.memoryTotal,
+            cpuTemperature: thermal.cpu, thermalState: thermal.state.rawValue,
+            hotApps: DemoData.appUsage().sorted { $0.watts > $1.watts }.prefix(5).map {
+                WidgetSnapshot.App(name: $0.name, watts: $0.watts, cpu: $0.cpu, memory: $0.memory, iconFile: iconFile($0.bundlePath))
+            },
+            freedThisMonth: 21_160_000_000)
+        let entry = SnapshotEntry(date: Date(), snapshot: snapshot)
+        func card<V: View>(_ view: V, _ width: CGFloat, _ height: CGFloat) -> some View {
+            view.padding(16)
+                .frame(width: width, height: height)
+                .background(WidgetStyle.background)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.08)))
+                .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
+                .environment(\.colorScheme, .dark)
+        }
+        return HStack(alignment: .top, spacing: 22) {
+            VStack(spacing: 22) {
+                card(HealthWidgetView(entry: entry, family: .systemMedium), 344, 162)
+                card(TemperatureWidgetView(entry: entry, family: .systemMedium), 344, 162)
+                HStack(spacing: 22) {
+                    card(StorageWidgetView(entry: entry, family: .systemSmall), 162, 162)
+                    card(TemperatureWidgetView(entry: entry, family: .systemSmall), 162, 162)
+                }
+            }
+            VStack(spacing: 22) {
+                card(TemperatureWidgetView(entry: entry, family: .systemLarge), 344, 344)
+                card(StorageWidgetView(entry: entry, family: .systemMedium), 344, 162)
+            }
+        }
+        .padding(40)
+        .frame(width: 1100, height: 620)
+        .background(LinearGradient(colors: [ModuleTheme.hex(0x1E2A4A), ModuleTheme.hex(0x3B1F4E), ModuleTheme.hex(0x0F172A)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing))
+    }
+
     /// Renders the README screenshots from demo data.   DevSweep --render-demo <output-dir>
     static func renderDemo(output: String) {
         let app = NSApplication.shared
@@ -360,7 +418,7 @@ enum ScreenRenderer {
         let size = NSSize(width: 1120, height: 740)
         let screens: [(SidebarSection, String)] = [
             (.overview, "smart-scan"), (.junk, "junk"), (.cloud, "cloud"), (.privacy, "privacy"), (.maintenance, "maintenance"),
-            (.memory, "memory"), (.loginItems, "login-items"), (.uninstaller, "uninstaller"), (.updater, "updater"),
+            (.memory, "memory"), (.heat, "temperature"), (.loginItems, "login-items"), (.uninstaller, "uninstaller"), (.updater, "updater"),
             (.storageMap, "storage-map"), (.largeFiles, "large-files"), (.duplicates, "duplicates"), (.projects, "projects"),
             (.caches, "caches"), (.devTools, "devtools"), (.autoClean, "auto-clean"), (.screenCleaning, "screen-cleaning"),
             (.history, "activity"),
@@ -369,7 +427,24 @@ enum ScreenRenderer {
             model.section = section
             snap(MainView(), size, name, output)
         }
-        snap(MenuBarPanel(showing: .memory), NSSize(width: 310, height: 770), "menubar", output, windowChrome: false)
+        snap(MenuBarPanel(showing: .memory), NSSize(width: 310, height: 840), "menubar", output, windowChrome: false)
+        snap(MenuBarPanel(showing: .heat), NSSize(width: 310, height: 840), "menubar-heat", output, windowChrome: false)
+        snap(widgetGallery(), NSSize(width: 1100, height: 620), "widgets", output, windowChrome: false)
+        // The readout next to the menu bar icon, on a strip like the menu bar.
+        let readout = MenuBarReadout.image(icon: "sparkles", items: MenuBarStat.allCases.map { stat in
+            (stat.symbol, ["temperature": "71°", "cpu": "18%", "memory": "64%", "freeSpace": "61G"][stat.rawValue] ?? "")
+        })
+        snap(HStack(spacing: 14) {
+                Spacer()
+                Image(systemName: "wifi"); Image(systemName: "battery.75percent")
+                Image(nsImage: readout).renderingMode(.template)
+                Text("Sat 25 Oct  10:41").font(.system(size: 13, weight: .medium))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(width: 520, height: 30)
+            .background(Color(white: 0.16)),
+             NSSize(width: 520, height: 30), "menubar-readout", output, windowChrome: false)
     }
 
     /// Puts the main window in full screen and captures it, to check nothing is drawn above

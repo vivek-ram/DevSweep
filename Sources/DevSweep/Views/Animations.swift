@@ -357,7 +357,6 @@ struct ProgressRing: View {
                 .stroke(AngularGradient(colors: [Brand.teal, Brand.indigo, Brand.teal], center: .center),
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .shadow(color: Brand.indigo.opacity(0.35), radius: 6)
         }
         .animation(.spring(duration: 0.5), value: progress)
     }

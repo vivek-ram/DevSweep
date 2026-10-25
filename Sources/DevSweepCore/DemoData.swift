@@ -427,22 +427,22 @@ public enum DemoData {
 
     /// Apps by memory, for the Memory page and menu bar. pids are made up.
     public static func appUsage() -> [AppUsage] {
-        func app(_ pid: Int32, _ name: String, _ path: String?, _ memory: Int64, cpu: Double, processes: Int) -> AppUsage {
-            AppUsage(id: path ?? name, name: name, bundlePath: path, pid: pid, memory: memory, cpu: cpu, processCount: processes)
+        func app(_ pid: Int32, _ name: String, _ path: String?, _ memory: Int64, cpu: Double, watts: Double, processes: Int) -> AppUsage {
+            AppUsage(id: path ?? name, name: name, bundlePath: path, pid: pid, memory: memory, cpu: cpu, processCount: processes, watts: watts)
         }
         return [
-            app(9001, "Google Chrome", "/Applications/Google Chrome.app", 3_410 * mb, cpu: 0.124, processes: 38),
-            app(9002, "Xcode", "/Applications/Xcode.app", 2_880 * mb, cpu: 0.312, processes: 7),
-            app(9003, "Visual Studio Code", "/Applications/Visual Studio Code.app", 1_820 * mb, cpu: 0.061, processes: 19),
-            app(9004, "Safari", "/Applications/Safari.app", 1_240 * mb, cpu: 0.018, processes: 11),
-            app(9005, "Firefox", "/Applications/Firefox.app", 960 * mb, cpu: 0.022, processes: 9),
-            app(9006, "node", nil, 640 * mb, cpu: 0.043, processes: 3),
-            app(9007, "Obsidian", "/Applications/Obsidian.app", 520 * mb, cpu: 0.004, processes: 5),
-            app(9008, "Music", "/System/Applications/Music.app", 310 * mb, cpu: 0.009, processes: 2),
-            app(9009, "Mail", "/System/Applications/Mail.app", 284 * mb, cpu: 0.002, processes: 3),
-            app(9010, "Finder", "/System/Library/CoreServices/Finder.app", 162 * mb, cpu: 0.003, processes: 2),
-            app(9011, "Messages", "/System/Applications/Messages.app", 151 * mb, cpu: 0.001, processes: 2),
-            app(9012, "python3.12", nil, 118 * mb, cpu: 0.0, processes: 1),
+            app(9001, "Google Chrome", "/Applications/Google Chrome.app", 3_410 * mb, cpu: 0.124, watts: 2.4, processes: 38),
+            app(9002, "Xcode", "/Applications/Xcode.app", 2_880 * mb, cpu: 1.62, watts: 6.8, processes: 7),
+            app(9003, "Visual Studio Code", "/Applications/Visual Studio Code.app", 1_820 * mb, cpu: 0.061, watts: 0.9, processes: 19),
+            app(9004, "Safari", "/Applications/Safari.app", 1_240 * mb, cpu: 0.018, watts: 0.4, processes: 11),
+            app(9005, "Firefox", "/Applications/Firefox.app", 960 * mb, cpu: 0.022, watts: 0.5, processes: 9),
+            app(9006, "node", nil, 640 * mb, cpu: 0.43, watts: 1.7, processes: 3),
+            app(9007, "Obsidian", "/Applications/Obsidian.app", 520 * mb, cpu: 0.004, watts: 0.05, processes: 5),
+            app(9008, "Music", "/System/Applications/Music.app", 310 * mb, cpu: 0.009, watts: 0.2, processes: 2),
+            app(9009, "Mail", "/System/Applications/Mail.app", 284 * mb, cpu: 0.002, watts: 0.03, processes: 3),
+            app(9010, "Finder", "/System/Library/CoreServices/Finder.app", 162 * mb, cpu: 0.003, watts: 0.02, processes: 2),
+            app(9011, "Messages", "/System/Applications/Messages.app", 151 * mb, cpu: 0.001, watts: 0.01, processes: 2),
+            app(9012, "python3.12", nil, 118 * mb, cpu: 0.0, watts: 0, processes: 1),
         ]
     }
 
@@ -463,6 +463,19 @@ public enum DemoData {
         snapshot.networkIn = 182_000
         snapshot.networkOut = 24_000
         snapshot.battery = SystemSnapshot.Battery(percent: 82, charging: false, onPower: false, minutesLeft: 312, cycleCount: 211, health: 94)
+        return snapshot
+    }
+
+    public static func thermal() -> ThermalSnapshot {
+        var snapshot = ThermalSnapshot()
+        snapshot.state = .fair
+        snapshot.cpu = 71.4
+        snapshot.hottest = 76.2
+        snapshot.battery = 31.5
+        snapshot.sensors = [("PMU tdie1", 76.2), ("PMU tdie4", 72.8), ("pACC MTR Temp Sensor2", 70.9), ("eACC MTR Temp Sensor0", 64.1),
+                            ("SOC MTR Temp Sensor1", 61.7), ("PMGR SOC Die Temp Sensor0", 59.8), ("GPU MTR Temp Sensor1", 54.3),
+                            ("ANE MTR Temp Sensor1", 41.0), ("NAND CH0 temp", 39.6), ("gas gauge battery", 31.5)]
+            .map { ThermalSnapshot.Sensor(name: $0.0, celsius: $0.1) }
         return snapshot
     }
 

@@ -107,6 +107,6 @@ struct AppGlyph: View {
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.15), radius: size * 0.04, y: size * 0.02)
             }
-            .shadow(color: Brand.indigo.opacity(0.25), radius: size * 0.12, y: size * 0.06)
+            .shadow(color: .black.opacity(0.2), radius: size * 0.05, y: size * 0.03)
     }
 }

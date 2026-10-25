@@ -139,7 +139,7 @@ struct AutoCleanView: View {
             ZStack {
                 GlassBackground(cornerRadius: 26)
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .fill(RadialGradient(colors: [theme.primary.opacity(0.22), .clear], center: .leading, startRadius: 0, endRadius: 420))
+                    .fill(RadialGradient(colors: [theme.primary.opacity(0.07), .clear], center: .leading, startRadius: 0, endRadius: 420))
             }
         }
     }

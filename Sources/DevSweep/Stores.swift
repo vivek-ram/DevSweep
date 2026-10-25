@@ -328,25 +328,37 @@ final class SystemMonitor {
     var networkHistory: [Double] = []
     /// Share of memory in use, newest last (about three minutes).
     var memoryHistory: [Double] = []
+    /// Temperatures and macOS's thermal state.
+    var thermal = ThermalSnapshot()
+    /// CPU temperature in °C, newest last (about three minutes).
+    var temperatureHistory: [Double] = []
     @ObservationIgnored private let sampler = SystemSampler()
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var watchers = 0
+    @ObservationIgnored private var slowWatchers = 0
 
-    /// Samples every two seconds while anything is showing the numbers.
-    func start() {
-        watchers += 1
-        guard timer == nil else { return }
-        tick()
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
-            Task { @MainActor in AppModel.shared.monitor.tick() }
-        }
+    /// Samples every two seconds while anything is showing the numbers, or every five when only
+    /// the menu bar readout is (`slow`).
+    func start(slow: Bool = false) {
+        if slow { slowWatchers += 1 } else { watchers += 1 }
+        reschedule()
     }
 
-    func stop() {
-        watchers = max(0, watchers - 1)
-        guard watchers == 0 else { return }
+    func stop(slow: Bool = false) {
+        if slow { slowWatchers = max(0, slowWatchers - 1) } else { watchers = max(0, watchers - 1) }
+        reschedule()
+    }
+
+    private func reschedule() {
+        let interval: TimeInterval? = watchers > 0 ? 2 : slowWatchers > 0 ? 5 : nil
+        guard interval != timer?.timeInterval else { return }
         timer?.invalidate()
         timer = nil
+        guard let interval else { return }
+        tick()
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
+            Task { @MainActor in AppModel.shared.monitor.tick() }
+        }
     }
 
     #if DEBUG
@@ -361,6 +373,11 @@ final class SystemMonitor {
         cpuHistory = wave.suffix(40).map { 0.14 + 0.08 * $0 }
         networkHistory = wave.suffix(40).map { 150_000 + 90_000 * $0 }
         memoryHistory = wave.map { 0.6 + 0.04 * $0 + 0.0008 * Double(wave.count) }
+        thermal = DemoData.thermal()
+        temperatureHistory = (0..<90).map { (i: Int) -> Double in
+            let step = Double(i)
+            return 64.0 + 5.0 * sin(step / 9.0) + step * 0.04
+        }
     }
     #endif
 
@@ -370,7 +387,12 @@ final class SystemMonitor {
         #endif
         let sampler = sampler
         Task {
-            let snapshot = await Task.detached(priority: .utility) { sampler.sample() }.value
+            let (snapshot, thermal) = await Task.detached(priority: .utility) { (sampler.sample(), ThermalSensors.read()) }.value
+            self.thermal = thermal
+            if let celsius = thermal.cpu {
+                temperatureHistory.append(celsius)
+                if temperatureHistory.count > 90 { temperatureHistory.removeFirst(temperatureHistory.count - 90) }
+            }
             withAnimation(.easeOut(duration: 0.4)) {
                 current = snapshot
                 cpuHistory.append(snapshot.cpu)

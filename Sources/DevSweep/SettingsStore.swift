@@ -80,7 +80,8 @@ final class SettingsStore {
     // Space history and the menu bar
     var trackSpaceHistory: Bool { didSet { defaults.set(trackSpaceHistory, forKey: "trackSpaceHistory") } }
     var growthAlerts: Bool { didSet { defaults.set(growthAlerts, forKey: "growthAlerts") } }
-    var menuBarShowsFreeSpace: Bool { didSet { defaults.set(menuBarShowsFreeSpace, forKey: "menuBarShowsFreeSpace") } }
+    /// Live readouts next to the menu bar icon.
+    var menuBarStats: [MenuBarStat] { didSet { defaults.set(menuBarStats.map(\.rawValue), forKey: "menuBarStats") } }
     var duplicateFolders: [String] { didSet { defaults.set(duplicateFolders, forKey: "duplicateFolders") } }
     var launchAtLogin: Bool
     var launchAtLoginError: String?
@@ -112,7 +113,9 @@ final class SettingsStore {
         autoCleanRuns = d.data(forKey: "autoCleanRuns").flatMap { try? JSONDecoder().decode([AutoCleanRun].self, from: $0) } ?? []
         trackSpaceHistory = d.object(forKey: "trackSpaceHistory") as? Bool ?? true
         growthAlerts = d.object(forKey: "growthAlerts") as? Bool ?? true
-        menuBarShowsFreeSpace = d.object(forKey: "menuBarShowsFreeSpace") as? Bool ?? false
+        // Earlier versions had a single "show free space" switch.
+        menuBarStats = d.stringArray(forKey: "menuBarStats").map { $0.compactMap(MenuBarStat.init) }
+            ?? ((d.object(forKey: "menuBarShowsFreeSpace") as? Bool ?? false) ? [.freeSpace] : [])
         duplicateFolders = d.stringArray(forKey: "duplicateFolders") ?? DuplicateFinder.defaultFolders()
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
@@ -149,4 +152,32 @@ final class SettingsStore {
             protectedPaths.append(path)
         }
     }
+}
+
+/// A live number shown next to the menu bar icon.
+enum MenuBarStat: String, CaseIterable, Identifiable {
+    case temperature, cpu, memory, freeSpace
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .temperature: "CPU temperature"
+        case .cpu: "CPU usage"
+        case .memory: "Memory used"
+        case .freeSpace: "Free disk space"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .temperature: "thermometer.medium"
+        case .cpu: "cpu"
+        case .memory: "memorychip"
+        case .freeSpace: "internaldrive"
+        }
+    }
+
+    /// Needs the system monitor running (free space doesn't).
+    var isLive: Bool { self != .freeSpace }
 }

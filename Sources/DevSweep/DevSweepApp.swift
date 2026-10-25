@@ -94,6 +94,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             UNUserNotificationCenter.current().delegate = self
         }
         AppModel.shared.start()
+        WidgetPublisher.shared.start()
+    }
+
+    /// devsweep://<page> links, from the desktop widgets.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { AppModel.shared.open(url) }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }

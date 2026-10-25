@@ -311,7 +311,7 @@ struct ScanProgressView: View {
     var body: some View {
         VStack(spacing: 16) {
             ZStack {
-                Circle().fill(RadialGradient(colors: [theme.primary.opacity(0.45), .clear], center: .center, startRadius: 0, endRadius: 110))
+                Circle().fill(RadialGradient(colors: [theme.primary.opacity(0.12), .clear], center: .center, startRadius: 0, endRadius: 110))
                     .frame(width: 220, height: 220)
                 ScanningOrb(size: 130, tint: .white)
             }

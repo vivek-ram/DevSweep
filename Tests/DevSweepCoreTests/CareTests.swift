@@ -234,3 +234,48 @@ import Testing
         #expect(again.allSatisfy { $0.cpu >= 0 })
     }
 }
+
+@Suite struct ThermalTests {
+    @Test func groupsSensorsByPartAndIgnoresCalibration() {
+        var snapshot = ThermalSnapshot()
+        snapshot.sensors = [("PMU tdie1", 61), ("PMU tdie4", 66), ("PMU tcal", 90), ("pACC MTR Temp Sensor2", 64),
+                            ("GPU MTR Temp Sensor1", 48), ("NAND CH0 temp", 37), ("gas gauge battery", 30), ("SOC MTR Temp Sensor0", 55)]
+            .map { ThermalSnapshot.Sensor(name: $0.0, celsius: $0.1) }
+        let groups = Dictionary(uniqueKeysWithValues: snapshot.groups.map { ($0.title, $0.celsius) })
+        #expect(groups["CPU cores"] == 66)      // the tcal reading (90) isn't a real temperature
+        #expect(groups["Graphics"] == 48)
+        #expect(groups["SSD"] == 37)
+        #expect(groups["Battery"] == 30)
+        #expect(groups["Chip"] == 55)
+        #expect(groups["Neural Engine"] == nil)
+    }
+
+    @Test func readsSensorsWithoutCrashing() {
+        let snapshot = ThermalSensors.read()
+        // Not every Mac (or CI machine) shares its sensors; when it does, readings are plausible.
+        if let cpu = snapshot.cpu { #expect(cpu > 5 && cpu < 130) }
+        #expect(snapshot.sensors.allSatisfy { $0.celsius > 5 && $0.celsius < 130 })
+    }
+}
+
+@Suite struct WidgetSnapshotTests {
+    @Test func survivesTheTripToTheWidget() throws {
+        var snapshot = WidgetSnapshot.sample
+        snapshot.hotApps[0].iconFile = "icon-abc.png"
+        snapshot.hotApps[1].iconFile = "/tmp/elsewhere.png"
+        let copy = try #require(WidgetSnapshot.decode(try snapshot.encoded()))
+        #expect(copy.healthScore == snapshot.healthScore)
+        #expect(copy.hotApps.map(\.name) == snapshot.hotApps.map(\.name))
+        #expect(abs(copy.date.timeIntervalSince(snapshot.date)) < 1)
+        #expect(copy.readyToFree == snapshot.junkBytes + snapshot.idleProjectBytes)
+        // A bare icon name lives in the widget folder; a full path is used as is.
+        #expect(copy.iconPath(copy.hotApps[0]) == WidgetSnapshot.folder + "/icon-abc.png")
+        #expect(copy.iconPath(copy.hotApps[1]) == "/tmp/elsewhere.png")
+        #expect(copy.iconPath(copy.hotApps[2]) == nil)
+    }
+
+    @Test func theWidgetFolderIsInTheRealHomeFolder() {
+        #expect(WidgetSnapshot.folder.hasSuffix("/Library/Application Support/DevSweep/Widget"))
+        #expect(!WidgetSnapshot.folder.contains("/Containers/"))
+    }
+}

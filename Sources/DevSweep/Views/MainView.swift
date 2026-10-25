@@ -23,6 +23,7 @@ struct MainView: View {
                 case .privacy: PrivacyView()
                 case .maintenance: MaintenanceView()
                 case .memory: MemoryView()
+                case .heat: TemperatureView()
                 case .loginItems: LoginItemsView()
                 case .uninstaller: UninstallerView()
                 case .updater: UpdaterView()
@@ -77,6 +78,7 @@ struct MainView: View {
             NSApp.setActivationPolicy(.regular)
         }
         .onReceive(NotificationCenter.default.publisher(for: .devSweepRescan)) { _ in rescan() }
+        .onOpenURL { model.open($0) }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
             if let window = note.object as? NSWindow, window === model.mainWindow {
                 NSApp.setActivationPolicy(.accessory)
@@ -102,7 +104,7 @@ extension MainView {
         case .loginItems: model.loginItems.refresh()
         case .privacy: model.privacy.scan()
         case .maintenance: model.maintenance.refresh()
-        case .memory: model.processes.refreshNow()
+        case .memory, .heat: model.processes.refreshNow()
         case .updater: model.updater.check()
         case .cloud: model.cloud.scan()
         case .autoClean, .screenCleaning: break

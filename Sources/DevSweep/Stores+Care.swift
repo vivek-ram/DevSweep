@@ -427,8 +427,8 @@ final class ProcessMonitorStore {
         }
     }
 
-    func top(by cpu: Bool, limit: Int) -> [AppUsage] {
-        Array((cpu ? apps.sorted { $0.cpu > $1.cpu } : apps).prefix(limit))
+    func top(by metric: UsageMetric, limit: Int) -> [AppUsage] {
+        Array(apps.sorted { metric.value($0) > metric.value($1) }.prefix(limit))
     }
 
     /// The running app behind a group, if it's one that can be quit like any other app.
