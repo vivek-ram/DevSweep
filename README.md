@@ -62,7 +62,8 @@ first.
   Cursor, Windsurf, ChatGPT, Perplexity, LM Studio, Ollama and the Codex, Gemini and Cursor CLIs,
   never your chats or projects), logs and crash reports, broken preference files, old installers,
   downloaded iPhone/iPad updates, old device backups, Mail downloads, and the Trash (external
-  drives included). Safe items are pre-ticked; archives and backups never are.
+  drives included). Safe items are pre-ticked; archives and backups never are. An app cache is
+  pre-ticked only when DevSweep knows that app rebuilds it (see [Safety first](#safety-first)).
 - **Cloud Cleanup:** big iCloud Drive, Dropbox, Google Drive and OneDrive files that are also
   downloaded on this Mac. *Free Up* removes only the local copy; the file stays in the cloud.
 
@@ -171,7 +172,7 @@ If a widget stays blank, open DevSweep: after an update it restarts the widget e
 
 ## Install
 
-1. Download **DevSweep-1.1.0.dmg** from the [latest release](https://github.com/vivek-ram/DevSweep/releases/latest).
+1. Download **DevSweep-1.1.1.dmg** from the [latest release](https://github.com/vivek-ram/DevSweep/releases/latest).
 2. Open it and drag **DevSweep** into **Applications**.
 3. Open DevSweep. It suggests the folders where your projects live; pick them and press
    **Start Scanning**.
@@ -191,6 +192,15 @@ permissions list, rather than macOS asking about each app.
 
 ## Safety first
 
+- **App caches are ticked only when DevSweep knows them.** Any app can keep anything in
+  `~/Library/Caches`, and some keep things there you can't get back, like downloaded artwork or
+  game data. So only caches DevSweep knows are rebuilt (browsers, updaters, chat and meeting apps,
+  editors, developer tools) are pre-ticked or ever cleaned automatically. Other apps' caches are
+  listed unticked with the reason, a cache holding many pictures, videos or sounds gets a warning,
+  and caches of **apps you build yourself** (unsigned, ad-hoc or development signed, or signed
+  with a Developer ID in your keychain) aren't listed at all.
+<p align="center"><img src="docs/screenshots/junk-review.png" alt="System Junk with app caches open: known caches ticked, others unticked with the reason" width="880"></p>
+
 - **Your code is never touched.** Only exact, well-known folder names are removed, and only next to
   the file that proves what they are: `target` needs a `Cargo.toml` beside it, `build` needs
   `build.gradle` or `pubspec.yaml`, a venv needs `pyvenv.cfg`, and so on. Every folder is checked
@@ -202,12 +212,17 @@ permissions list, rather than macOS asking about each app.
   differing list goes to `requirements-snapshot.txt` instead.
 - **Node projects without a lockfile** get `node_modules.snapshot.json` with the exact installed
   versions.
-- **The Trash by default.** Removed folders and files go to the Trash. *Free Trash Space* deletes
-  only what DevSweep put there, never the rest of your Trash.
+- **The Trash by default, and you can put things back.** Removed folders and files go to the
+  Trash; right-click them in **My Activity** and choose **Put Back**. What you clean yourself is
+  never emptied from the Trash for you. Auto-Clean only empties old installers it moved there
+  itself, and *Free Trash Space* deletes only what DevSweep put there, never the rest of your Trash.
 - **Passwords stay out of it.** Saved browser passwords and cards are never touched, and admin
   tasks ask for your password in macOS's own prompt, which DevSweep never sees.
-- **Protect anything.** Protect a project from the Projects list, or drop an empty
-  `.devsweep-keep` file into any folder to protect it and everything below it.
+- **Protect anything, everywhere.** Add folders to **Settings → Never clean**, right-click any
+  junk item and choose **Never Clean This**, protect a project from the Projects list, or drop an
+  empty `.devsweep-keep` file into any folder (an app's cache folder too). Protected folders are
+  left out of every scan, and every removal checks again just before it happens, on every page and
+  during Auto-Clean.
 
 ## How "idle" is decided
 
@@ -280,7 +295,7 @@ swift build && .build/debug/DevSweep --render-demo docs/screenshots
 | `Sources/DevSweep` | The SwiftUI app: one `@Observable` store per module, the views, the theme (module colours, glass cards, the Core Animation background) and the menu bar extra. |
 | `Sources/devsweep-cli` | The command-line tool. |
 | `Sources/DevSweepWidgets`, `Sources/DevSweepWidgetUI` | The WidgetKit extension and its views. The extension is sandboxed and only reads a snapshot the app writes to `~/Library/Application Support/DevSweep/Widget`. |
-| `Tests/DevSweepCoreTests` | 74 tests on temporary fixture folders, covering scanning, retention, snapshots, cleaning safety, junk rules, privacy, health, temperature, updates and more. |
+| `Tests/DevSweepCoreTests` | 83 tests on temporary fixture folders, covering scanning, retention, snapshots, cleaning safety, junk rules, privacy, health, temperature, updates and more. |
 
 Some details:
 

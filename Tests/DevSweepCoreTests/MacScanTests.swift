@@ -73,6 +73,8 @@ import Testing
         let items = JunkScanner.scan(home: f.root)
         let byName = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0) })
         #expect(byName["com.example.app"]?.category == .appCaches)
+        #expect(byName["com.example.app"]?.suggested == false, "unknown apps' caches aren't ticked")
+        #expect(byName["com.example.app"]?.note != nil)
         #expect(byName["com.apple.Safari"] == nil, "Apple's caches are left alone")
         #expect(byName["pip"] == nil, "developer caches have their own page")
         #expect(byName["SomeApp"]?.category == .logs)

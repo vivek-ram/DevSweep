@@ -1,13 +1,15 @@
 import Foundation
 
-/// What an unattended clean may touch. Only things that are disposable by definition;
-/// archives, device updates, the Trash and virtual environments are never cleaned on their own.
+/// What an unattended clean may touch. Only things that are disposable by definition: caches
+/// DevSweep knows the app rebuilds (never one it doesn't recognise), logs and old installers.
+/// Archives, device updates, the Trash and virtual environments are never cleaned on their own.
 public struct AutoCleanRules: Codable, Hashable, Sendable {
     public var appCaches = true
     public var logs = true
     public var oldInstallers = true
     public var installerAgeDays = 30
-    /// Permanently delete items DevSweep moved to the Trash once they've sat there a while.
+    /// Permanently delete installers Auto-Clean moved to the Trash once they've sat there a while.
+    /// Anything you cleaned yourself stays in the Trash until you empty it.
     public var emptyTrashedItems = true
     public var trashedItemAgeDays = 7
     /// pip, npm, Homebrew downloads and the like (re-downloaded when needed).
@@ -32,7 +34,8 @@ public enum AutoClean {
                               now: Date = Date()) -> [JunkItem] {
         items.filter { item in
             switch item.category {
-            case .appCaches: rules.appCaches && !isInUse(cacheName: item.name, running: running)
+            // Only caches ticked by default: ones DevSweep knows (see CacheSafety).
+            case .appCaches: rules.appCaches && item.suggested && !isInUse(cacheName: item.name, running: running)
             case .aiClutter: rules.appCaches && !isInUse(cacheName: aiAppName(item), running: running)
             case .logs: rules.logs
             case .installers: rules.oldInstallers && now.timeIntervalSince(item.modified) > Double(rules.installerAgeDays) * 86_400
@@ -70,8 +73,9 @@ public enum AutoClean {
         CacheCatalog.installed(home: home).filter { $0.caution == nil }
     }
 
-    /// Items DevSweep put in the Trash more than `days` ago that are still there.
+    /// Items Auto-Clean put in the Trash more than `days` ago that are still there. What you
+    /// cleaned yourself is never emptied for you: the Trash is where you'd look for a mistake.
     public static func trashedItemsToEmpty(_ history: [CleanupRecord], olderThanDays days: Int, now: Date = Date()) -> [CleanupRecord] {
-        Cleaner.itemsStillInTrash(history).filter { now.timeIntervalSince($0.date) > Double(days) * 86_400 }
+        Cleaner.itemsStillInTrash(history).filter { $0.automatic && now.timeIntervalSince($0.date) > Double(days) * 86_400 }
     }
 }

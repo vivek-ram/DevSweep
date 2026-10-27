@@ -586,6 +586,29 @@ final class AppModel {
         refreshTrash()
     }
 
+    /// Adds a folder to "Never clean" and drops it (and anything inside it) from the lists.
+    func neverClean(_ path: String) {
+        if !settings.protectedPaths.contains(path) { settings.protectedPaths.append(path) }
+        withAnimation {
+            junk.removeAll { Protection.isProtected($0.path) }
+            junkSelection = junkSelection.filter { !Protection.isProtected($0) }
+        }
+        WidgetPublisher.shared.publish(soon: true)
+    }
+
+    /// Moves something DevSweep put in the Trash back where it was, and marks it in the history.
+    func putBack(_ record: CleanupRecord) throws {
+        try Cleaner.putBack(record)
+        if let index = history.firstIndex(where: { $0.id == record.id }) {
+            history[index].outcome = .skipped
+            history[index].message = "Put back from the Trash"
+            history[index].trashPath = nil
+            store.saveHistory(history)
+        }
+        refreshTrash()
+        refreshDisk()
+    }
+
     func clearHistory() {
         history.removeAll()
         store.saveHistory(history)

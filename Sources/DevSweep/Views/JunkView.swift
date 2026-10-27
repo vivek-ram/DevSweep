@@ -79,22 +79,39 @@ struct JunkView: View {
     }
 }
 
-private struct CategoryCard: View {
+struct CategoryCard: View {
     @Environment(AppModel.self) private var model
     let category: JunkCategory
     let items: [JunkItem]
-    @State private var expanded = false
+    @State private var expanded: Bool
+
+    init(category: JunkCategory, items: [JunkItem]) {
+        self.category = category
+        self.items = items
+        #if DEBUG
+        _expanded = State(initialValue: Self.startExpanded.contains(category))
+        #else
+        _expanded = State(initialValue: false)
+        #endif
+    }
+
+    #if DEBUG
+    /// Categories the screenshot renderer shows open.
+    nonisolated(unsafe) static var startExpanded: Set<JunkCategory> = []
+    #endif
 
     var body: some View {
         @Bindable var model = model
         let paths = Set(items.map(\.path))
+        // Ticking the whole category leaves out items with a warning; those are ticked one by one.
+        let bulkPaths = Set(items.filter { $0.caution == nil }.map(\.path))
         let selectedCount = paths.intersection(model.junkSelection).count
         Card(padding: 0) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 12) {
                     Toggle("", isOn: Binding(
-                        get: { selectedCount == paths.count },
-                        set: { on in if on { model.junkSelection.formUnion(paths) } else { model.junkSelection.subtract(paths) } }
+                        get: { !bulkPaths.isEmpty && bulkPaths.isSubset(of: model.junkSelection) },
+                        set: { on in if on { model.junkSelection.formUnion(bulkPaths) } else { model.junkSelection.subtract(paths) } }
                     ))
                     .toggleStyle(.checkbox)
                     .labelsHidden()
@@ -130,7 +147,9 @@ private struct CategoryCard: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(displayName(item)).lineLimit(1)
                                 if let caution = item.caution {
-                                    Label(caution, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange).lineLimit(1)
+                                    Label(caution, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange).lineLimit(2)
+                                } else if let note = item.note {
+                                    Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                                 }
                                 Text(Paths.display(item.path)).font(.caption).foregroundStyle(.tertiary).lineLimit(1).truncationMode(.middle)
                             }
@@ -139,7 +158,12 @@ private struct CategoryCard: View {
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
-                        .contextMenu { Button("Show in Finder") { model.reveal(item.path) } }
+                        .contextMenu {
+                            Button("Show in Finder") { model.reveal(item.path) }
+                            if item.category != .trash {
+                                Button("Never Clean This") { model.neverClean(item.path) }
+                            }
+                        }
                         .transition(.asymmetric(insertion: .opacity, removal: .move(edge: .leading).combined(with: .opacity)))
                     }
                     .padding(.vertical, 4)

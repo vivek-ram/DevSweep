@@ -168,8 +168,9 @@ case "junk":
         let group = items.filter { $0.category == category }
         guard !group.isEmpty else { continue }
         print("\(category.title): \(Format.bytes(group.reduce(0) { $0 + $1.bytes }))")
-        for item in group.prefix(8) {
-            print("  \(item.suggested ? "•" : " ") \(lpad(Format.bytes(item.bytes), 10))  \(Paths.display(item.path))")
+        for item in group.prefix(category == .appCaches ? 40 : 8) {
+            let why = item.caution ?? item.note
+            print("  \(item.suggested ? "•" : " ") \(lpad(Format.bytes(item.bytes), 10))  \(Paths.display(item.path))\(why.map { "  — \($0)" } ?? "")")
         }
     }
 

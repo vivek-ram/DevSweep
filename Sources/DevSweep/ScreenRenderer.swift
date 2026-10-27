@@ -427,6 +427,11 @@ enum ScreenRenderer {
             model.section = section
             snap(MainView(), size, name, output)
         }
+        // System Junk with App caches open: which caches are ticked, and why the others aren't.
+        CategoryCard.startExpanded = [.appCaches]
+        model.section = .junk
+        snap(MainView(), size, "junk-review", output)
+        CategoryCard.startExpanded = []
         snap(MenuBarPanel(showing: .memory), NSSize(width: 310, height: 840), "menubar", output, windowChrome: false)
         snap(MenuBarPanel(showing: .heat), NSSize(width: 310, height: 840), "menubar-heat", output, windowChrome: false)
         snap(widgetGallery(), NSSize(width: 1100, height: 620), "widgets", output, windowChrome: false)

@@ -59,7 +59,13 @@ final class SettingsStore {
     var removalMode: RemovalMode { didSet { defaults.set(removalMode.rawValue, forKey: "removalMode") } }
     var automation: AutomationMode { didSet { defaults.set(automation.rawValue, forKey: "automation") } }
     var smartLowSpace: Bool { didSet { defaults.set(smartLowSpace, forKey: "smartLowSpace") } }
-    var protectedPaths: [String] { didSet { defaults.set(protectedPaths, forKey: "protectedPaths") } }
+    /// "Never clean": protected everywhere, not only in project scans (see Protection).
+    var protectedPaths: [String] {
+        didSet {
+            defaults.set(protectedPaths, forKey: "protectedPaths")
+            Protection.paths = protectedPaths
+        }
+    }
     var snapshotPython: Bool { didSet { defaults.set(snapshotPython, forKey: "snapshotPython") } }
     var snapshotNode: Bool { didSet { defaults.set(snapshotNode, forKey: "snapshotNode") } }
     /// Virtual environments are never removed without an explicit OK for each one.
@@ -98,6 +104,7 @@ final class SettingsStore {
         automation = d.string(forKey: "automation").flatMap(AutomationMode.init(rawValue:)) ?? .notify
         smartLowSpace = d.object(forKey: "smartLowSpace") as? Bool ?? true
         protectedPaths = d.stringArray(forKey: "protectedPaths") ?? []
+        Protection.paths = d.stringArray(forKey: "protectedPaths") ?? []
         snapshotPython = d.object(forKey: "snapshotPython") as? Bool ?? true
         snapshotNode = d.object(forKey: "snapshotNode") as? Bool ?? true
         askBeforeVenvs = d.object(forKey: "askBeforeVenvs") as? Bool ?? true

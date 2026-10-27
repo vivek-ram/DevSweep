@@ -167,7 +167,7 @@ private struct FolderSettings: View {
             } header: {
                 Text("Never clean")
             } footer: {
-                Text("You can also drop an empty \(ArtifactRules.keepMarker) file into any folder to protect it and everything inside.")
+                Text("DevSweep never removes anything in these folders, on any page or during Auto-Clean. You can also drop an empty \(ArtifactRules.keepMarker) file into any folder (an app's cache folder too) to protect it and everything inside.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

@@ -13,7 +13,7 @@ struct AutoCleanView: View {
                 Card {
                     VStack(alignment: .leading, spacing: 12) {
                         CardTitle(title: "What gets cleaned", subtitle: "Only things that are safe to lose. Caches and logs are deleted; installers go to the Trash first.")
-                        ruleToggle("App caches", "Including AI apps' caches. Skips apps that are open right now.", \.appCaches)
+                        ruleToggle("App caches", "Only caches DevSweep knows the app rebuilds, never ones it doesn't recognise. Skips apps that are open right now.", \.appCaches)
                         ruleToggle("Logs and crash reports", nil, \.logs)
                         HStack {
                             ruleToggle("Installers in Downloads", "Disk images and packages older than the age on the right.", \.oldInstallers)
@@ -23,7 +23,7 @@ struct AutoCleanView: View {
                                 .disabled(!settings.autoCleanRules.oldInstallers)
                         }
                         HStack {
-                            ruleToggle("Empty DevSweep's items from the Trash", "Only what DevSweep moved there, after it's sat for the days on the right.", \.emptyTrashedItems)
+                            ruleToggle("Empty old installers from the Trash", "Only installers Auto-Clean moved there, after the days on the right. What you clean yourself stays in the Trash.", \.emptyTrashedItems)
                             Spacer()
                             Stepper("\(settings.autoCleanRules.trashedItemAgeDays) days", value: $settings.autoCleanRules.trashedItemAgeDays, in: 1...60)
                                 .fixedSize()

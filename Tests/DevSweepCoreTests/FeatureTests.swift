@@ -20,6 +20,12 @@ import Testing
         #expect(chosen == ["com.idle.app", "Old", "old.dmg"])
     }
 
+    @Test func neverCleansCachesItDoesNotRecognise() {
+        var unknown = junk(.appCaches, "com.me.ConsoleMac")
+        unknown.suggested = false
+        #expect(AutoClean.select([unknown], rules: AutoCleanRules(), running: []).isEmpty)
+    }
+
     @Test func rulesCanTurnCategoriesOff() {
         var rules = AutoCleanRules()
         rules.appCaches = false
@@ -32,11 +38,15 @@ import Testing
         let f = Fixture()
         let old = f.file("fake/.Trash/old_modules/a")
         let fresh = f.file("fake/.Trash/new_modules/a")
+        let mine = f.file("fake/.Trash/artwork/a")
         let records = [
-            CleanupRecord(date: Date().addingTimeInterval(-10 * 86_400), projectPath: "/p", itemPath: "/p/a", kind: "nodeModules",
-                          bytes: 1, mode: .trash, outcome: .removed, trashPath: Paths.parent(old)),
-            CleanupRecord(date: Date(), projectPath: "/p", itemPath: "/p/b", kind: "nodeModules",
-                          bytes: 1, mode: .trash, outcome: .removed, trashPath: Paths.parent(fresh)),
+            CleanupRecord(date: Date().addingTimeInterval(-10 * 86_400), projectPath: "/p", itemPath: "/p/a", kind: "junk:installers",
+                          bytes: 1, mode: .trash, outcome: .removed, trashPath: Paths.parent(old), automatic: true),
+            CleanupRecord(date: Date(), projectPath: "/p", itemPath: "/p/b", kind: "junk:installers",
+                          bytes: 1, mode: .trash, outcome: .removed, trashPath: Paths.parent(fresh), automatic: true),
+            // Cleaned by hand: stays in the Trash however old it is.
+            CleanupRecord(date: Date().addingTimeInterval(-30 * 86_400), projectPath: "/p", itemPath: "/p/c", kind: "junk:appCaches",
+                          bytes: 1, mode: .trash, outcome: .removed, trashPath: Paths.parent(mine)),
         ]
         #expect(AutoClean.trashedItemsToEmpty(records, olderThanDays: 7).map(\.itemPath) == ["/p/a"])
     }

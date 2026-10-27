@@ -22,7 +22,7 @@ public enum JunkCategory: String, CaseIterable, Codable, Sendable, Identifiable 
 
     public var detail: String {
         switch self {
-        case .appCaches: "Temporary files apps keep to load faster. Apps recreate what they need."
+        case .appCaches: "Files apps keep to load faster. Only caches DevSweep knows the app rebuilds are ticked."
         case .aiClutter: "Caches and logs left by AI apps and command-line tools. Your chats and projects aren't touched."
         case .logs: "Diagnostic logs and crash reports apps have written."
         case .brokenPreferences: "Settings files that can't be read anymore. The app makes a fresh one next time it starts."
@@ -58,11 +58,13 @@ public struct JunkItem: Identifiable, Hashable, Sendable {
     public let bytes: Int64
     public let modified: Date
     /// Ticked when the review opens.
-    public let suggested: Bool
+    public var suggested: Bool
     /// A friendlier name than the file name ("Cursor · Code Cache", "Alex's iPhone").
     public var label: String? = nil
     /// Shown when removing it has a cost.
     public var caution: String? = nil
+    /// Why it isn't ticked, when that's not obvious.
+    public var note: String? = nil
 
     public var name: String { (path as NSString).lastPathComponent }
 }
@@ -75,7 +77,8 @@ public enum JunkScanner {
     static let keptCacheNames: Set<String> = ["CloudKit", "FamilyCircle", "GeoServices", "PassKit", "com.apple.bird"]
 
     /// Blocking; measures every item (in parallel). Reading Downloads can make macOS ask the
-    /// user for permission (and wait for the answer), so it can be left out.
+    /// user for permission (and wait for the answer), so it can be left out. Protected folders
+    /// (see Protection) aren't listed.
     public static func scan(home: String = NSHomeDirectory(), now: Date = Date(), includeDownloads: Bool = true) -> [JunkItem] {
         DiskUsage.avoidDownloadingCloudFiles()
         let fm = FileManager.default
@@ -132,6 +135,7 @@ public enum JunkScanner {
         if fm.fileExists(atPath: deviceLogs) {
             candidates.append((.logs, deviceLogs, true))
         }
+        candidates.removeAll { Protection.isProtected($0.path) }
         let aiLabels = Dictionary(uniqueKeysWithValues: aiClutterFolders(home: home))
         let backupInfo = Dictionary(uniqueKeysWithValues: backups.map { ($0.path, $0) })
 
@@ -147,6 +151,18 @@ public enum JunkScanner {
             var item = JunkItem(category: candidate.category, path: candidate.path, bytes: bytes,
                                 modified: Date(timeIntervalSince1970: TimeInterval(st.st_mtimespec.tv_sec)),
                                 suggested: candidate.suggested)
+            if candidate.category == .appCaches {
+                switch CacheSafety.verdict(name: item.name, path: candidate.path) {
+                case .known: break
+                case .yourApp: return
+                case .unknown:
+                    item.suggested = false
+                    item.note = "Not ticked: DevSweep doesn't know whether this app can rebuild what it keeps here."
+                case .holdsMedia(let count):
+                    item.suggested = false
+                    item.caution = "Holds \(count) pictures, videos or sounds. Some apps keep artwork or downloads in their cache."
+                }
+            }
             if candidate.category == .aiClutter { item.label = aiLabels[candidate.path] }
             if candidate.category == .trash, candidate.path.hasPrefix("/Volumes/") {
                 item.label = "Trash on " + (candidate.path.split(separator: "/").dropFirst().first.map(String.init) ?? "drive")

@@ -114,6 +114,9 @@ public enum Cleaner {
     /// Moves `path` to the Trash or deletes it. Returns the item's location in the Trash.
     @discardableResult
     public static func remove(_ path: String, mode: RemovalMode) throws -> String? {
+        // The last check before anything goes: a protected folder is never touched, whichever
+        // page asked. (Emptying the Trash is the one exception: what's in it was already removed.)
+        if !isInTrash(path), Protection.isProtected(path) { throw Protection.Refused(path: path) }
         let url = URL(fileURLWithPath: path)
         switch mode {
         case .trash:
@@ -270,6 +273,26 @@ public enum Cleaner {
     }
 
     /// Permanently deletes only the items DevSweep itself put in the Trash (never the rest of it).
+    public enum PutBackError: LocalizedError {
+        case notInTrash, pathTaken(String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .notInTrash: "It's no longer in the Trash."
+            case .pathTaken(let path): "Something else is already at \(Paths.display(path))."
+            }
+        }
+    }
+
+    /// Moves an item DevSweep put in the Trash back to where it was.
+    public static func putBack(_ record: CleanupRecord) throws {
+        guard let trash = record.trashPath, !itemsStillInTrash([record]).isEmpty else { throw PutBackError.notInTrash }
+        let fm = FileManager.default
+        guard !fm.fileExists(atPath: record.itemPath) else { throw PutBackError.pathTaken(record.itemPath) }
+        try fm.createDirectory(atPath: Paths.parent(record.itemPath), withIntermediateDirectories: true)
+        try fm.moveItem(atPath: trash, toPath: record.itemPath)
+    }
+
     public static func purgeFromTrash(_ records: [CleanupRecord]) -> (freed: Int64, failures: Int) {
         var freed: Int64 = 0
         var failures = 0

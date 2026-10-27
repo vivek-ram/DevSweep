@@ -7,6 +7,7 @@ struct HistoryView: View {
     @State private var selection = Set<CleanupRecord.ID>()
     @State private var confirmPurge = false
     @State private var confirmClear = false
+    @State private var putBackProblems: [String] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -112,7 +113,17 @@ struct HistoryView: View {
                 }
                 .width(min: 160, ideal: 260)
             }
+            .alert("Some items couldn't be put back", isPresented: Binding(get: { !putBackProblems.isEmpty }, set: { if !$0 { putBackProblems = [] } })) {
+                Button("OK") { putBackProblems = [] }
+            } message: {
+                Text(putBackProblems.joined(separator: "\n"))
+            }
             .contextMenu(forSelectionType: CleanupRecord.ID.self) { ids in
+                let restorable = Cleaner.itemsStillInTrash(model.history.filter { ids.contains($0.id) })
+                if !restorable.isEmpty {
+                    Button(restorable.count == 1 ? "Put Back" : "Put Back \(restorable.count) Items") { putBack(restorable) }
+                    Divider()
+                }
                 if let record = model.history.first(where: { ids.contains($0.id) }) {
                     if let snapshot = record.snapshotPath {
                         Button("Show Saved Requirements") { model.reveal(snapshot) }
@@ -131,6 +142,17 @@ struct HistoryView: View {
                                            description: Text("Everything DevSweep removes is listed here, with any requirements files it saved."))
                 }
             }
+    }
+
+    /// Moves items back from the Trash to where they were.
+    private func putBack(_ records: [CleanupRecord]) {
+        var problems: [String] = []
+        for record in records {
+            do { try model.putBack(record) } catch {
+                problems.append("\((record.itemPath as NSString).lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+        putBackProblems = problems
     }
 
     private func title(_ record: CleanupRecord) -> String {

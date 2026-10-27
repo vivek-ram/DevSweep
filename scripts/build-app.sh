@@ -10,7 +10,7 @@ UNIVERSAL=false
 [[ " $* " == *" --universal "* ]] && UNIVERSAL=true
 
 APP=build/DevSweep.app
-VERSION=1.1.0
+VERSION=1.1.1
 BUNDLE_ID=app.devsweep.DevSweep
 
 echo "› Compiling (release)…"
